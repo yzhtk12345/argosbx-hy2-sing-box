@@ -2532,11 +2532,7 @@ rc-service "$svc" stop >/dev/null 2>&1
 rc-update del "$svc" default >/dev/null 2>&1
 done
 rm -rf /etc/init.d/{sing-box,xray,argo} /etc/local.d/alpineargosbx.start /etc/local.d/alpinesubsbx.start
-iptables -t nat -F PREROUTING >/dev/null 2>&1
-ip6tables -t nat -F PREROUTING >/dev/null 2>&1
-netfilter-persistent save >/dev/null 2>&1
-rc-service iptables save >/dev/null 2>&1
-rc-service ip6tables save >/dev/null 2>&1
+# 防火墙规则保留：卸载/重置时不删除现有 iptables/ip6tables 规则。
 fi
 }
 xrestart(){
@@ -2654,15 +2650,57 @@ fi
 echo "VPS系统：$op"
 echo "CPU架构：$cpu"
 echo "Argosbx脚本未安装，开始安装…………" && sleep 1
-if [ -n "$oap" ]; then
-setenforce 0 >/dev/null 2>&1
-iptables -P INPUT ACCEPT >/dev/null 2>&1
-iptables -P FORWARD ACCEPT >/dev/null 2>&1
-iptables -P OUTPUT ACCEPT >/dev/null 2>&1
-iptables -F >/dev/null 2>&1
-netfilter-persistent save >/dev/null 2>&1
-echo
-echo "iptables执行开放所有端口"
+# 仅放行本脚本实际使用的端口；不清空现有防火墙规则、不修改默认策略。
+allow_firewall_port(){
+  local port="$1" proto="$2"
+  case "$port" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null || return 0
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+    ufw allow "$port/$proto" >/dev/null 2>&1
+    echo "防火墙放行：$port/$proto (ufw)"
+  elif command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    firewall-cmd --permanent --add-port="$port/$proto" >/dev/null 2>&1 && firewall-cmd --reload >/dev/null 2>&1
+    echo "防火墙放行：$port/$proto (firewalld)"
+  elif command -v iptables >/dev/null 2>&1; then
+    if ! iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT >/dev/null 2>&1; then
+      iptables -I INPUT 1 -p "$proto" --dport "$port" -j ACCEPT >/dev/null 2>&1
+    fi
+    if command -v ip6tables >/dev/null 2>&1 && ! ip6tables -C INPUT -p "$proto" --dport "$port" -j ACCEPT >/dev/null 2>&1; then
+      ip6tables -I INPUT 1 -p "$proto" --dport "$port" -j ACCEPT >/dev/null 2>&1
+    fi
+    echo "防火墙放行：$port/$proto (iptables)"
+  fi
+}
+
+# Xray 入站端口
+[ "$xhp" = xhpt ] && allow_firewall_port "$port_xh" tcp
+[ "$vxp" = vxpt ] && allow_firewall_port "$port_vx" tcp
+[ "$xup" = xupt ] && allow_firewall_port "$port_xu" udp
+[ "$xcp" = xcpt ] && { allow_firewall_port "$port_xc" tcp; allow_firewall_port "$port_xc" udp; }
+[ "$vwp" = vwpt ] && allow_firewall_port "$port_vw" tcp
+[ "$vlp" = vlpt ] && allow_firewall_port "$port_vl_re" tcp
+[ "$vmp" = vmpt ] && allow_firewall_port "$port_vm_ws" tcp
+
+# Sing-box / 其他入站端口
+[ "$nvp" = nvpt ] && allow_firewall_port "$port_nv" tcp
+[ "$tup" = tupt ] && allow_firewall_port "$port_tu" udp
+[ "$anp" = anpt ] && allow_firewall_port "$port_an" tcp
+[ "$arp" = arpt ] && allow_firewall_port "$port_ar" tcp
+[ "$ssp" = sspt ] && { allow_firewall_port "$port_ss" tcp; allow_firewall_port "$port_ss" udp; }
+[ "$sop" = sopt ] && { allow_firewall_port "$port_so" tcp; allow_firewall_port "$port_so" udp; }
+[ "$hyp" = hypt ] && allow_firewall_port "$port_hy2" udp
+
+# 若启用了 Hysteria2 跳跃端口，只放行用户指定的 UDP 端口。
+if [ -n "$hyjpt" ] && [ "$hyp" = hypt ]; then
+  for fwport in $hyjpt; do allow_firewall_port "$fwport" udp; done
+fi
+
+# 保存新增的 iptables 规则（不清空、不重置已有规则）。
+command -v netfilter-persistent >/dev/null 2>&1 && netfilter-persistent save >/dev/null 2>&1
+if command -v rc-service >/dev/null 2>&1; then
+  rc-service iptables save >/dev/null 2>&1
+  rc-service ip6tables save >/dev/null 2>&1
 fi
 if [ ! -f "$HOME/agsbx/SHA256.txt" ]; then
 command -v openssl >/dev/null 2>&1 && openssl ecparam -genkey -name prime256v1 -out "$HOME/agsbx/private.key" >/dev/null 2>&1
@@ -2745,12 +2783,19 @@ fi
 if [ -n "$hyjpt" ] && [ -n "$hyp" ]; then
 echo
 echo "设置Hysteria2协议的跳跃端口：$hyjpt"
-iptables -t nat -F PREROUTING >/dev/null 2>&1
-ip6tables -t nat -F PREROUTING >/dev/null 2>&1
 hyport=$(cat "$HOME/agsbx/port_hy2")
+# 使用专属 NAT 链，避免清空系统 PREROUTING 中其他程序的规则。
+iptables -t nat -N ARGOSBX_HY2 2>/dev/null
+iptables -t nat -F ARGOSBX_HY2 >/dev/null 2>&1
+iptables -t nat -C PREROUTING -j ARGOSBX_HY2 >/dev/null 2>&1 || iptables -t nat -I PREROUTING 1 -j ARGOSBX_HY2
+ip6tables -t nat -N ARGOSBX_HY2 2>/dev/null
+ip6tables -t nat -F ARGOSBX_HY2 >/dev/null 2>&1
+ip6tables -t nat -C PREROUTING -j ARGOSBX_HY2 >/dev/null 2>&1 || ip6tables -t nat -I PREROUTING 1 -j ARGOSBX_HY2
 for port in $hyjpt; do
-iptables -t nat -A PREROUTING -p udp --dport "$port" -j DNAT --to-destination :$hyport
-ip6tables -t nat -A PREROUTING -p udp --dport "$port" -j DNAT --to-destination :$hyport
+  case "$port" in ''|*[!0-9]*) continue ;; esac
+  [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null || continue
+  iptables -t nat -A ARGOSBX_HY2 -p udp --dport "$port" -j DNAT --to-destination :"$hyport"
+  ip6tables -t nat -A ARGOSBX_HY2 -p udp --dport "$port" -j DNAT --to-destination :"$hyport"
 done
 netfilter-persistent save >/dev/null 2>&1
 if command -v rc-service >/dev/null 2>&1 && command -v rc-update >/dev/null 2>&1; then
