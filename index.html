@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ArgoSBX一键SSH命令生成器-甬哥ygkkk</title>
+  <title>Guoye Argosbx 专属 SSH 命令生成器</title>
   <style>
     :root {
       --bg:#0b1020;
@@ -387,7 +387,7 @@
           </svg>
         </label>
       </div>
-      <h1>ArgoSBX小钢炮脚本💣一键SSH命令生成器 V26.7.16</h1>
+      <h1>Guoye Argosbx 专属一键 SSH 命令生成器 V26.7.16</h1>
       <p>
         甬哥Github项目：
         <a href="https://github.com/yonggekkk" target="_blank">github.com/yonggekkk</a><br>
@@ -425,7 +425,7 @@
           </div>
         </div>
         <div class="protocol-group separator">
-          <h3>自动(已选Xray则用Xray，否则Singbox)：</h3>
+          <h3>自动选择内核：已选择其他 Sing-box 协议则使用 Sing-box，否则使用 Xray；仅选择 Hysteria2 时使用 Sing-box：</h3>
           <div class="protocol-grid">
             <label><input type="checkbox" data-proto="hypt"> Hysteria2 <span class="pill">hypt</span></label><input type="text" placeholder="留空则随机端口" data-port="hypt">
             <label><input type="checkbox" data-proto="vmpt"> Vmess-ws <span class="pill">vmpt</span></label><input type="text" placeholder="留空则随机端口（Argo固定隧道的URL端口相同）" data-port="vmpt">
@@ -569,8 +569,9 @@ Acme-yg域名IP证书脚本：bash <(curl -Ls https://raw.githubusercontent.com/
 
 <script>
 (function(){
-  const CURL = 'bash <(curl -Ls https://raw.githubusercontent.com/yonggekkk/argosbx/main/argosbx.sh)';
-  const WGET = 'bash <(wget -qO- https://raw.githubusercontent.com/yonggekkk/argosbx/main/argosbx.sh)';
+  const CURL = 'bash <(curl -Ls https://raw.githubusercontent.com/yzhtk12345/argosbx-hy2-sing-box/main/argosbx.sh)';
+  const WGET = 'bash <(wget -qO- https://raw.githubusercontent.com/yzhtk12345/argosbx-hy2-sing-box/main/argosbx.sh)';
+
   const protoKeys = ['sopt','vmpt','vlpt','xhpt','vxpt','vwpt','xupt','xcpt','hypt','tupt','nvpt','anpt','arpt','sspt'];
   const optIds = ['warp','ippz','uuid','reym','cfip','alns','hyjpt','cdnym','name', 'oap', 'sub', 'subid', 'subpt'];
 
