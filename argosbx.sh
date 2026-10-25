@@ -1,7 +1,7 @@
 #!/bin/bash
 export LANG=en_US.UTF-8
 mkdir -p "$HOME/agsbx"
-url='https://raw.githubusercontent.com/yonggekkk/argosbx/main/argosbx.sh'
+url='https://raw.githubusercontent.com/yzhtk12345/argosbx-hy2-sing-box/main/argosbx.sh'
 case "${*##* }" in list|del|upx|ups|upa|res) ;; *)
 cmd=""
 for v in uuid vlpt vmpt vwpt hypt tupt xhpt vxpt anpt arpt sspt sopt nvpt xupt xcpt reym cdnym argo agn agk warp name oap; do
@@ -769,6 +769,8 @@ echo "$port_hy2" > "$HOME/agsbx/port_hy2"
 fi
 port_hy2=$(cat "$HOME/agsbx/port_hy2")
 echo "Hysteria2端口：$port_hy2"
+# 内核规则：选了其他 Sing-box 协议则用 Sing-box；否则若有 Xray 协议则用 Xray；只选 HY2 时用 Sing-box。
+if [ "$nvp" = yes ] || [ "$tup" = yes ] || [ "$anp" = yes ] || [ "$arp" = yes ] || [ "$ssp" = yes ] || [ "$sop" = yes ] || { [ "$hyp" = hypt ] && [ "$xhp" != yes ] && [ "$vlp" != yes ] && [ "$vxp" != yes ] && [ "$vwp" != yes ] && [ "$xup" != yes ] && [ "$xcp" != yes ]; }; then
 cat >> "$HOME/agsbx/sb.json" <<EOF
     {
         "type": "hysteria2",
@@ -792,9 +794,47 @@ cat >> "$HOME/agsbx/sb.json" <<EOF
     },
 EOF
 else
+cat >> "$HOME/agsbx/xr.json" <<EOF
+    {
+      "tag": "hy2-xr",
+      "protocol": "hysteria",
+      "port": ${port_hy2},
+      "settings": {
+        "version": 2,
+        "clients": [
+          {
+            "auth": "${uuid}"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "hysteria",
+        "security": "tls",
+        "tlsSettings": {
+		  "alpn": [
+             "h3"
+            ],
+          "certificates": [
+            {
+              "certificateFile": "$certificateHTA",
+              "keyFile": "$keyHTA"
+            }
+          ]
+        }
+      },
+	   "sniffing": {
+       "enabled": true,
+       "destOverride": ["http", "tls", "quic"],
+       "metadataOnly": false
+       }
+    },
+EOF
+fi
+else
 hyp=hyptargo
 fi
 }
+
 xrsbvm(){
 if [ -n "$vmp" ]; then
 vmp=vmpt
